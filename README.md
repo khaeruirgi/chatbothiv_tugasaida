@@ -63,13 +63,14 @@ Program ini dikembangkan menggunakan:
 - Python
 - Pandas
 - Regular Expression (re)
+- python-telegram-bot
 
 Library Python yang digunakan:
 
 ```
 pandas
 re
-openpyxl
+python-telegram-bot
 ```
 
 ---
@@ -83,7 +84,7 @@ Pastikan Python sudah terinstall di komputer Anda.
 ### 2. Install library yang dibutuhkan
 
 ```
-pip install pandas openpyxl
+pip install pandas python-telegram-bot
 ```
 
 ### 3. Pastikan file berikut berada dalam satu folder
@@ -91,7 +92,6 @@ pip install pandas openpyxl
 ```
 chatbot.py
 DASHBARD KEL 6B.xlsx
-README.md
 ```
 
 ### 4. Jalankan program
@@ -102,7 +102,7 @@ python chatbot.py
 
 ### 5. Gunakan chatbot di terminal
 
-Setelah program dijalankan, pengguna dapat langsung mengetik pertanyaan di terminal.
+Setelah program dijalankan, pengguna dapat langsung mengetik pertanyaan pada https://t.me/hiv_chatbot
 
 Contoh pertanyaan yang dapat diajukan:
 
