@@ -1,14 +1,26 @@
-import pandas as pd
+import os
 import re
+import pandas as pd
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+import openai
 
-# BACA DATA DARI EXCEL
-file_path = 'DASHBARD KEL 6B.xlsx'
+# KONFIGURASI
+BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "8469714703:AAHmzUxeW0HWT6oOGbRbH1TeQFKfLTQnXtg")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "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")
+
+openai.api_key = OPENAI_API_KEY
+
+# DEFINE DATA DARI EXCEL
+FILE_PATH = 'DASHBARD KEL 6B.xlsx'
+
 try:
-    df = pd.read_excel(file_path, sheet_name='Data', header=None)
+    df = pd.read_excel(FILE_PATH, sheet_name='Data', header=None)
 except FileNotFoundError:
-    print("File tidak ditemukan. Pastikan 'DASHBARD KEL 6B.xlsx' berada di direktori yang sama.")
+    print(f"File '{FILE_PATH}' tidak ditemukan. Pastikan file berada di direktori yang sama.")
+    exit()
+except Exception as e:
+    print(f"Gagal membaca file Excel: {e}")
     exit()
 
 # Inisialisasi struktur data
@@ -29,7 +41,7 @@ for idx, row in df.iterrows():
         try:
             no_int = int(no)
             kasus_int = int(kasus) if pd.notna(kasus) else 0
-            provinsi.append({'no': no_int, 'provinsi': nama_prov, 'kasus': kasus_int})
+            provinsi.append({'no': no_int, 'provinsi': nama_prov.strip(), 'kasus': kasus_int})
         except:
             pass
 
@@ -53,13 +65,13 @@ for idx, row in df.iterrows():
 
     # Data Regimen per Umur (kolom H-L)
     if pd.notna(row[7]) and 'Tahun' in str(row[7]):
-        umur = row[7]
+        umur = row[7].strip()
         regimen.append({
             'umur': umur,
-            'TDF+3TC/FTC+LPV/r': row[8] if pd.notna(row[8]) and row[8] != '-' else 0,
-            'AZT+3TC+EFV': row[9] if pd.notna(row[9]) and row[9] != '-' else 0,
-            'TDF+3TC+LPV/r': row[10] if pd.notna(row[10]) and row[10] != '-' else 0,
-            'AZT+3TC+EFV2': row[11] if pd.notna(row[11]) and row[11] != '-' else 0
+            'TDF+3TC/FTC+LPV/r': int(row[8]) if pd.notna(row[8]) and row[8] != '-' else 0,
+            'AZT+3TC+EFV': int(row[9]) if pd.notna(row[9]) and row[9] != '-' else 0,
+            'TDF+3TC+LPV/r': int(row[10]) if pd.notna(row[10]) and row[10] != '-' else 0,
+            'AZT+3TC+EFV2': int(row[11]) if pd.notna(row[11]) and row[11] != '-' else 0
         })
 
     # Data Kepatuhan dan Kematian (kolom G-H)
@@ -126,6 +138,7 @@ alias_provinsi = {
     'babel': 'Bangka Belitung',
     'bengkulu': 'Bengkulu',
 }
+
 # Balikkan alias: tambahkan ke dict dengan nilai objek provinsi
 provinsi_by_alias = {}
 for alias, nama_lengkap in alias_provinsi.items():
@@ -136,6 +149,7 @@ for alias, nama_lengkap in alias_provinsi.items():
 
 # FUNGSI BANTU
 def format_angka(angka):
+    """Format angka dengan pemisah ribuan titik."""
     return f"{angka:,}".replace(',', '.')
 
 def cari_provinsi_dari_teks(teks):
@@ -250,7 +264,7 @@ def data_regimen():
     if regimen:
         resp = "Data regimen HIV berdasarkan umur (data 2025):\n"
         for r in regimen:
-            resp += f"Umur {r['umur']}: TDF+3TC/FTC+LPV/r = {r['TDF+3TC/FTC+LPV/r']}, AZT+3TC+EFV = {r['AZT+3TC+EFV']}, TDF+3TC+LPV/r = {r['TDF+3TC+LPV/r']}, AZT+3TC+EFV2 = {r['AZT+3TC+EFV2']}\n"
+            resp += f"Umur {r['umur']}: TDF+3TC/FTC+LPV/r = {format_angka(r['TDF+3TC/FTC+LPV/r'])}, AZT+3TC+EFV = {format_angka(r['AZT+3TC+EFV'])}, TDF+3TC+LPV/r = {format_angka(r['TDF+3TC+LPV/r'])}, AZT+3TC+EFV2 = {format_angka(r['AZT+3TC+EFV2'])}\n"
         return resp
     else:
         return "Data regimen tidak tersedia."
@@ -275,6 +289,36 @@ def data_provinsi(prov):
 def daftar_provinsi():
     daftar = ', '.join([p['provinsi'] for p in provinsi])
     return f"Daftar 38 provinsi di Indonesia: {daftar}"
+
+# FUNGSI CHATGPT
+def tanya_chatgpt(pertanyaan):
+    """
+    Kirim pertanyaan ke ChatGPT dengan batasan topik HIV.
+    """
+    if not OPENAI_API_KEY:
+        return "Maaf, layanan AI tidak dikonfigurasi. Hubungi administrator."
+
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "Anda adalah asisten ahli HIV/AIDS. "
+                        "Anda hanya boleh menjawab pertanyaan yang berkaitan dengan HIV/AIDS. "
+                        "Jika pertanyaan tidak berkaitan, tolak dengan sopan dan arahkan kembali ke topik HIV. "
+                        "Berikan jawaban yang informatif, akurat, dan mudah dipahami."
+                    )
+                },
+                {"role": "user", "content": pertanyaan}
+            ],
+            max_tokens=400,
+            temperature=0.7
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        return f"Maaf, terjadi kesalahan saat menghubungi layanan AI: {e}"
 
 # FUNGSI UTAMA
 def jawab_pertanyaan(pertanyaan):
@@ -329,7 +373,6 @@ Cukup tanyakan dengan bahasa sehari-hari.
 
     # Data regimen
     if re.search(r'\b(regimen|obat hiv|terapi hiv|jenis obat|obat berdasarkan umur|data regimen)\b', q):
-        # Tambahkan penjelasan singkat sebelum menampilkan data
         return "Regimen HIV adalah kombinasi obat ARV yang digunakan. Berikut data regimen berdasarkan umur:\n\n" + data_regimen()
 
     # Data kepatuhan dan kematian
@@ -374,12 +417,18 @@ Cukup tanyakan dengan bahasa sehari-hari.
         if re.search(r'\b(provinsi|kasus|data)\b', q):
             return "Maaf, saya tidak menemukan provinsi yang dimaksud. Ketik 'daftar provinsi' untuk melihat semua provinsi."
 
-    # Jika tidak ada pola yang cocok
-    return "Maaf, saya tidak mengerti pertanyaan Anda. Coba tanyakan tentang HIV, gejala, penularan, pencegahan, pengobatan, ARV, regimen, atau data kasus di provinsi. Ketik 'bantuan' untuk melihat fitur yang tersedia."
+    # Jika tidak ada pola yang cocok, cek apakah pertanyaan terkait HIV
+    kata_kunci_hiv = ['hiv', 'aids', 'virus', 'obat', 'arv', 'regimen', 'gejala', 
+                      'penularan', 'pencegahan', 'pengobatan', 'kondom', 'seks', 
+                      'darah', 'jarum', 'infeksi', 'imun', 'cd4', 'viral load', 
+                      'resistensi', 'efek samping', 'terapi', 'antiretroviral']
 
-# LOOP TELEGRAM BOT
-TOKEN = '8469714703:AAHmzUxeW0HWT6oOGbRbH1TeQFKfLTQnXtg'
+    if any(kata in q for kata in kata_kunci_hiv):
+        return tanya_chatgpt(pertanyaan)
+    else:
+        return "Maaf, saya hanya dapat menjawab pertanyaan seputar HIV. Silakan tanyakan hal lain tentang HIV."
 
+# TELEGRAM BOT HANDLER
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "Selamat datang di Chatbot HIV Indonesia (Kelompok 6B)!\n"
@@ -392,10 +441,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     bot_response = jawab_pertanyaan(user_message)
     await update.message.reply_text(bot_response)
 
+# MAIN
 if __name__ == '__main__':
-    application = Application.builder().token(TOKEN).build()
+    application = Application.builder().token(BOT_TOKEN).build()
     application.add_handler(CommandHandler("start", start))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-    print("Bot sedang berjalan... Tekan Ctrl+C di terminal untuk berhenti.")
+    print("Bot sedang berjalan... Tekan Ctrl+C untuk berhenti.")
     application.run_polling()
