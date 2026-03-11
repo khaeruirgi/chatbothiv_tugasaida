@@ -1,5 +1,8 @@
 import pandas as pd
 import re
+import logging
+from telegram import Update
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
 # BACA DATA DARI EXCEL
 file_path = 'DASHBARD KEL 6B.xlsx'
@@ -375,17 +378,25 @@ Cukup tanyakan dengan bahasa sehari-hari.
     # Jika tidak ada pola yang cocok
     return "Maaf, saya tidak mengerti pertanyaan Anda. Coba tanyakan tentang HIV, gejala, penularan, pencegahan, pengobatan, ARV, regimen, atau data kasus di provinsi. Ketik 'bantuan' untuk melihat fitur yang tersedia."
 
-# LOOP CHATBOT
-print("="*60)
-print("Selamat datang di Chatbot HIV Indonesia")
-print("Data yang digunakan adalah perkiraan tahun 2025.")
-print("Ketik 'keluar' untuk berhenti, atau 'bantuan' untuk melihat fitur.")
-print("="*60)
+# LOOP TELEGRAM BOT
+TOKEN = '8469714703:AAHmzUxeW0HWT6oOGbRbH1TeQFKfLTQnXtg'
 
-while True:
-    pertanyaan = input("\nAnda: ")
-    if pertanyaan.lower() in ['keluar', 'exit', 'quit', 'selesai', 'bye']:
-        print("Bot: Terima kasih telah menggunakan chatbot ini. Tetap sehat!")
-        break
-    jawaban = jawab_pertanyaan(pertanyaan)
-    print("Bot:", jawaban)
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "Selamat datang di Chatbot HIV Indonesia (Kelompok 6B)!\n"
+        "Data yang digunakan adalah perkiraan tahun 2025.\n"
+        "Ketik apa saja atau 'bantuan' untuk melihat fitur."
+    )
+
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_message = update.message.text
+    bot_response = jawab_pertanyaan(user_message)
+    await update.message.reply_text(bot_response)
+
+if __name__ == '__main__':
+    application = Application.builder().token(TOKEN).build()
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+
+    print("Bot sedang berjalan... Tekan Ctrl+C di terminal untuk berhenti.")
+    application.run_polling()
