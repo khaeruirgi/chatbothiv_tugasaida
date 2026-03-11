@@ -3,13 +3,14 @@ import re
 import pandas as pd
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
-import openai
+from google import genai
+from google.genai import types
 
 # KONFIGURASI
-BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "8469714703:AAHmzUxeW0HWT6oOGbRbH1TeQFKfLTQnXtg")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "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")
+BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "TELEGRAM_TOKEN")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "GEMINI_TOKEN")
 
-openai.api_key = OPENAI_API_KEY
+client = genai.Client(api_key=GEMINI_API_KEY)
 
 # DEFINE DATA DARI EXCEL
 FILE_PATH = 'DASHBARD KEL 6B.xlsx'
@@ -291,32 +292,25 @@ def daftar_provinsi():
     return f"Daftar 38 provinsi di Indonesia: {daftar}"
 
 # FUNGSI CHATGPT
-def tanya_chatgpt(pertanyaan):
+def tanya_gemini(pertanyaan):
     """
-    Kirim pertanyaan ke ChatGPT dengan batasan topik HIV.
+    Kirim pertanyaan ke Gemini dengan batasan topik HIV.
     """
-    if not OPENAI_API_KEY:
+    if not GEMINI_API_KEY or GEMINI_API_KEY == "YOUR_GEMINI_API_KEY":
         return "Maaf, layanan AI tidak dikonfigurasi. Hubungi administrator."
 
     try:
-        response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "Anda adalah asisten ahli HIV/AIDS. "
-                        "Anda hanya boleh menjawab pertanyaan yang berkaitan dengan HIV/AIDS. "
-                        "Jika pertanyaan tidak berkaitan, tolak dengan sopan dan arahkan kembali ke topik HIV. "
-                        "Berikan jawaban yang informatif, akurat, dan mudah dipahami."
-                    )
-                },
-                {"role": "user", "content": pertanyaan}
-            ],
-            max_tokens=400,
-            temperature=0.7
+        # Gunakan client yang sudah dikonfigurasi
+        response = client.models.generate_content(
+            model='gemini-3.1-flash-lite-preview',
+            contents=pertanyaan,
+            config=types.GenerateContentConfig(
+                system_instruction="Anda adalah asisten ahli HIV/AIDS. Anda hanya boleh menjawab pertanyaan yang berkaitan dengan HIV/AIDS. Jika pertanyaan tidak berkaitan, tolak dengan sopan dan arahkan kembali ke topik HIV. Berikan jawaban yang informatif dalam naratif deskriptif, sangat singkat itu keharusan, dan mudah dipahami.",
+                max_output_tokens=400,
+                temperature=0.7,
+            )
         )
-        return response.choices[0].message.content
+        return response.text
     except Exception as e:
         return f"Maaf, terjadi kesalahan saat menghubungi layanan AI: {e}"
 
@@ -418,13 +412,13 @@ Cukup tanyakan dengan bahasa sehari-hari.
             return "Maaf, saya tidak menemukan provinsi yang dimaksud. Ketik 'daftar provinsi' untuk melihat semua provinsi."
 
     # Jika tidak ada pola yang cocok, cek apakah pertanyaan terkait HIV
-    kata_kunci_hiv = ['hiv', 'aids', 'virus', 'obat', 'arv', 'regimen', 'gejala', 
-                      'penularan', 'pencegahan', 'pengobatan', 'kondom', 'seks', 
-                      'darah', 'jarum', 'infeksi', 'imun', 'cd4', 'viral load', 
+    kata_kunci_hiv = ['hiv', 'aids', 'virus', 'obat', 'arv', 'regimen', 'gejala',
+                      'penularan', 'pencegahan', 'pengobatan', 'kondom', 'seks',
+                      'darah', 'jarum', 'infeksi', 'imun', 'cd4', 'viral load',
                       'resistensi', 'efek samping', 'terapi', 'antiretroviral']
 
     if any(kata in q for kata in kata_kunci_hiv):
-        return tanya_chatgpt(pertanyaan)
+        return tanya_gemini(pertanyaan)
     else:
         return "Maaf, saya hanya dapat menjawab pertanyaan seputar HIV. Silakan tanyakan hal lain tentang HIV."
 
