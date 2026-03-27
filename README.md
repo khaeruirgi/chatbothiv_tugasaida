@@ -197,4 +197,3 @@ Bot: [Jawaban dari Gemini AI berupa penjelasan naratif tentang pencegahan HIV]
 ## Tujuan Proyek
 
 Tujuan dari proyek ini adalah mengembangkan chatbot sederhana yang dapat memberikan informasi mengenai HIV serta menampilkan data epidemiologi HIV di Indonesia secara interaktif melalui platform Telegram dengan memanfaatkan kecerdasan buatan Google Gemini AI.
-```
